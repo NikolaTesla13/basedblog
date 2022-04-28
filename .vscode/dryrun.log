@@ -1,0 +1,11 @@
+make --dry-run --always-make --keep-going --print-directory
+make: Entering directory '/mnt/d/BasedBlog'
+rm build/*
+gcc -g -Wall -Iinclude -c src/main.c -o build/main.o
+gcc -g -Wall -Iinclude -c src/md4c.c -o build/md4c.o
+gcc -g -Wall -Iinclude -c src/md4c-html.c -o build/md4c-html.o
+gcc -g -Wall -Iinclude -c src/entity.c -o build/entity.o
+gcc -g -Wall -Iinclude build/main.o build/md4c.o build/md4c-html.o build/entity.o -o build/blog
+./build/blog
+make: Leaving directory '/mnt/d/BasedBlog'
+ 

@@ -22,4 +22,4 @@ run:
 	./build/blog
 
 clean:
-	rm build/*
+	-rm build/*
