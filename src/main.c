@@ -84,7 +84,7 @@ int main(int argc, char* argv[]) {
 	FILE* out = fopen("output/index.html", "w+");
 	if(out == NULL) {
 		printf("error while opening the build file\n");
-		return EXIT_SUCCESS;
+		return EXIT_FAILURE;
 	}
 
 	DIR* directory;
@@ -96,12 +96,39 @@ int main(int argc, char* argv[]) {
 		return EXIT_FAILURE;
 	}
 
-	char out_html[409600] = "<title>Steve's blog</title><h2>Recent articles:</h2><ul>";
+	FILE* template = fopen("templates/index.html", "r");
+	size_t lsize;
+	char* template_buffer;
+
+	if(template == NULL) {
+		printf("index template file not found\n");
+		return EXIT_FAILURE;
+	}
+	
+	fseek(template, 0L, SEEK_END);
+	lsize = ftell(template);
+	rewind(template);
+
+	template_buffer = calloc(1, lsize+1);
+	if(!template_buffer) {
+		fclose(template);
+		printf("calloc failed\n");
+		return EXIT_FAILURE;
+	}
+
+	if(fread(template_buffer, lsize, 1, template) != 1) {
+		free(template_buffer);
+		fclose(template);
+		printf("fread failed\n");
+		return EXIT_FAILURE;
+	}
+
+	char out_html[409600] = "\0";
 
 	while((dir = readdir(directory)) != NULL) {
 		if(dir->d_name[0] == '.') 
 			continue;
-		printf("Processing the %s file.\n", dir->d_name);
+		//printf("Processing the %s file.\n", dir->d_name);
 	
 		char path[PATH_MAX] = "";
 		strcat(path, source_folder);
@@ -114,12 +141,12 @@ int main(int argc, char* argv[]) {
 		ssize_t read;
 			
 		pstate = UNDEFINED;
-		char config[1024][1024] = { "" }, content_md[4096000] = "";
+		char config[12][4096] = { "" }, content_md[4096000] = "";
 		unsigned int config_length = 0;
 
 		while((read = getline(&line, &len, current_file)) != -1) {
 			if(pstate == CONFIG && (line[0] != '-' && line[0] != '\n')) {
-				char key[1024]="", value[2014]="";
+				char key[4096]="", value[4096]="";
 				int ik=0, iv=0;
 				for(int i=0; i<strlen(line); i++) {
 					if(line[i] == '\n') continue;
@@ -149,7 +176,7 @@ int main(int argc, char* argv[]) {
 			}
 		}
 		
-		char atitle[256] = "\0", adesc[256] = "\0", adate[256] = "\0";	
+		char atitle[4096] = "\0", adesc[4096] = "\0", adate[4096] = "\0";	
 		for(int i=0; i <= config_length-2; i+=2) {
 			//printf("key = %s; value = %s\n", config[i], config[i+1]);
 			if(strcmp(config[i], "title") == 0)
@@ -159,10 +186,12 @@ int main(int argc, char* argv[]) {
 			else if(strcmp(config[i], "date"))
 				strcat(adate, config[i+1]);
 		}
+
 		/*printf("%s", content_md);*/
+		
 		strcat(out_html, "<li><a href='articles/");
 		strcat(out_html, dir->d_name);
-		out_html[strlen(out_html)-3] = '\0';
+		out_html[strlen(out_html)-3] = '\0'; // remove ".md"
 		strcat(out_html, ".html'>");
 		strcat(out_html, atitle);
 		strcat(out_html, "</a></li>");
@@ -177,16 +206,16 @@ int main(int argc, char* argv[]) {
 		
 		membuf_init(&buf_out, (size_t)(buf_in.size + buf_in.size/8 + 64));
 		
-		char pre_data[256] = "<title>";
+		char pre_data[256] = "<head><link rel='stylesheet' href='../styles.css'><title>";
 		strcat(pre_data, atitle);
-		strcat(pre_data, "</title>");
-		strcat(pre_data, "<pre><p>title: ");
+		strcat(pre_data, "</title></head><body>");
+		strcat(pre_data, "<code><p>title: ");
 		strcat(pre_data, atitle);
 		strcat(pre_data, "</p><p>description: ");
 		strcat(pre_data, adate);
 		strcat(pre_data, "</p><p>publish date: ");
 		strcat(pre_data, adesc); // wtf?? 
-		strcat(pre_data, "</p></pre><hr />");
+		strcat(pre_data, "</p></code><hr />");
 		membuf_append(&buf_out, pre_data, strlen(pre_data));
 
 		int ret = md_html(buf_in.data, (size_t)buf_in.size, md_callback, (void*)&buf_out, NULL, MD_HTML_FLAG_DEBUG);
@@ -194,6 +223,9 @@ int main(int argc, char* argv[]) {
 			printf("parsing the file failed.\n");
 			exit(ret);
 		}
+		
+		char end_data[256] = "<hr /><footer>go back <a href='../index.html'>home</a></footer><script src='//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.5.1/highlight.min.js'></script><script>hljs.highlightAll();</script></body>";
+		membuf_append(&buf_out, end_data, strlen(end_data));
 
 		// printf("%s", buf_out.data);
 
@@ -212,10 +244,13 @@ int main(int argc, char* argv[]) {
 		fclose(current_file);
 		free(line);
 	}
+	
+	char rly_out_html[4096000];
+	sprintf(rly_out_html, template_buffer, out_html);
+	fwrite(rly_out_html, strlen(rly_out_html), 1, out);
 
-	strcat(out_html, "</ul>");
-	fwrite(out_html, strlen(out_html), 1, out);
-
+	fclose(template);
+	free(template_buffer);
 	closedir(directory);
 	fclose(out);
 

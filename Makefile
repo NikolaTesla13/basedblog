@@ -1,5 +1,6 @@
 CC=gcc
 CFLAGS=-g -Wall -Iinclude
+#CFLAGS=-O2 -Iinclude
 
 all: clean blog run
 
@@ -23,3 +24,4 @@ run:
 
 clean:
 	-rm build/*
+	-rm output/articles/*
